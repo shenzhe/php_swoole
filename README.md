@@ -1,66 +1,134 @@
-php_swoole
-==========
+Swoole
+=====
+PHP's asynchronous & concurrent & distributed networking framework.
 
-PHP extension.A socket server framework.
+* Event-driven
+* Full asynchronous non-blocking
+* Multi-Thread or Multi-Process
+* Millisecond timer
+* Asynchronous MySQL
+* AsyncTask workers
 
-feature
+Install
+-----
+```
+pecl install swoole
+```
+
+
+Example
 -----
 
-* event driver. callback php function.
-* asynchronous and non-blocking.
-* no lock. no thread mutex. no semaphore.
-* separate read and write.
-* it can run at multi thread or multi proccess.
+__Server__
+```php
+$serv = new swoole_server("127.0.0.1", 9501);
+$serv->on('connect', function ($serv, $fd){
+ 	echo "Client:Connect.\n";
+});
+$serv->on('receive', function ($serv, $fd, $from_id, $data) {
+	$serv->send($fd, 'Swoole: '.$data);
+    $serv->close($fd);
+});
+$serv->on('close', function ($serv, $fd) {
+ 	echo "Client: Close.\n";
+});
+$serv->start();
+```
+__Client__
+```php
+$client = new swoole_client(SWOOLE_SOCK_TCP, SWOOLE_SOCK_ASYNC);
 
-example
+$client->on("connect", function($cli) {
+    $cli->send("hello world\n");
+});
+
+$client->on("receive", function($cli){
+    $data = $cli->recv();
+    echo "Receive: $data\n";
+});
+
+$client->on("error", function($cli){
+    echo "connect fail\n";
+});
+
+$client->on("close", function($cli){
+    echo "close\n";
+    $cli->close();
+});
+
+$client->connect('127.0.0.1', 9501, 0.5);
+```
+__Event__
+```php
+$fp = stream_socket_client("tcp://127.0.0.1:9501", $errno, $errstr, 30);
+if (!$fp) {
+    exit("$errstr ($errno)\n");
+}
+fwrite($fp, "HELLO world");
+swoole_event_add($fp, function($fp){
+	echo fgets($fp, 1024);
+	swoole_event_del($fp);
+    fclose($fp);
+});
+```
+
+__Task__
+```php
+$serv = new swoole_server("127.0.0.1", 9502);
+$serv->on('Receive', function($serv, $fd, $from_id, $data) {
+    $task_id = $serv->task("Async");
+    echo "Dispath AsyncTask: id=$task_id\n";
+});
+$serv->on('Task', function ($serv, $task_id, $from_id, $data) {
+    echo "New AsyncTask[id=$task_id]".PHP_EOL;
+    $serv->finish("$data -> OK");
+});
+$serv->on('Finish', function ($serv, $task_id, $data) {
+    echo "AsyncTask[$task_id] Finish: $data".PHP_EOL;
+});
+$serv->start();
+```
+
+__Files__
+* PHP: [examples/server.php](examples/server.php)
+* C/C++: [examples/server.c](examples/server.c)
+* Client: [examples/client.php](examples/client.php)
+
+Developer Mail-List
 -----
-<pre>
-<?php
->$serv = swoole_server_create("127.0.0.1", 9500, 1);
-swoole_server_set($serv, array(
-    'timeout'=>2.5,
-    'poll_thread_num'=>1,
-    'writer_num'=>2,
-    'worker_num'=>2,
-    'backlog'=>128,
-));
-function my_onStart($serv)
-{
-    echo "Server：start\n";
-}
+* Google Group: <https://groups.google.com/forum/#!forum/swoole>  
+* Email: <swoole@googlegroups.com>
 
-function my_onShutdown($serv)
-{
-    echo "Server：onShutdown(\n";
-}
 
-function my_onClose($serv,$fd,$from_id)
-{
-  echo "Client：Close. fd=$fd|from_id=$from_id\n";
-}
+For PHP
+-----
+```shell
+cd swoole/
+phpize
+./configure
+make && make install
+```
 
-function my_onConnect($serv,$fd,$from_id)
-{
-	echo "Client：Connect. fd=$fd|from_id=$from_id\n";
-}
+For C/C++
+-----
+```shell
+cd swoole/
+cmake .
+make && make install
+```
 
-function my_onReceive($serv,$fd,$from_id,$data)
-{
-	echo "Client：Data. fd=$fd|from_id=$from_id|data=$data\n";
-	swoole_server_send($serv, $fd, "Server:$data");
-}
+PHP Application Server
+-----
+https://github.com/matyhtf/swoole_framework
 
-swoole_server_handler($serv, 'onStart', 'my_onStart');
-swoole_server_handler($serv, 'onConnect', 'my_onConnect');
-swoole_server_handler($serv, 'onReceive', 'my_onReceive');
-swoole_server_handler($serv, 'onClose', 'my_onClose');
-swoole_server_handler($serv, 'onShutdown', 'my_onShutdown');
 
-swoole_server_start($serv);
-?>
-</pre>
-	php server.php
+Document
+----
+* [Document 中文](http://www.swoole.com/wiki/index/) 
+* Document English. Wait moment.
 
-	telnet 127.0.0.1 9500
-	hello
-	server: hello
+License
+-----
+Apache License Version 2.0 <http://www.apache.org/licenses/LICENSE-2.0.html>
+
+
